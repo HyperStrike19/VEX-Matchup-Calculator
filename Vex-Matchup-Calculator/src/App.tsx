@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 var overviewTeamName = '';
 var h2hTeamAName = '';
@@ -11,6 +11,47 @@ export default function App() {
   const [teamA_Input, setTeamA_Input] = useState('');
   const [teamB_Input, setTeamB_Input] = useState('');
   const [overviewTeam, setOverviewTeam] = useState('');
+  // 1. Tell TypeScript what a "Season" object looks like
+  type Season = {
+    id: number;
+    name: string;
+    years_start: number;
+    years_end: number;
+  };
+
+  // 2. Set up our state variables
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [activeSeason, setActiveSeason] = useState<string>("");
+
+  // 3. Fetch the master list of seasons when the app loads
+  useEffect(() => {
+    const fetchSeasons = async () => {
+      try {
+        // 👇 1. Define your headers right here so this function can use them!
+        const headers = {
+          Authorization: "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzIiwianRpIjoiMWYwMDA5ODdhZjFjODFlY2M2Zjg1Nzc2YzhkYmFkZWViMWI1NTM0OTcwOWEzYjhiNGM0ZWRlYmY4NGE1NzBmMzJlMDJlMDliZDMxOWRmZDkiLCJpYXQiOjE3NzYzNjkwNjMuMTM4ODQyMSwibmJmIjoxNzc2MzY5MDYzLjEzODg0NCwiZXhwIjoyNzIzMTQwMjYzLjEzMzY2NDEsInN1YiI6IjE1OTQ0NSIsInNjb3BlcyI6W119.L1b8M29nPICa8H8u4vsgPYLaS88q9k9g4qcPSAeTtKw3z0lGbLQydpb9a4k02c9qfvviTcLdtGLezcRdTYc867r9aflOMd6JJUqFUxJ9byXf694yRICVkPq-HQaNbsRd8J7bY4kPos45CeDqrg5xx_3EBV4jQKxR3wQN5qac9jdrMr5Fn4BqG8Zj8ApbT3CKZ1G6CLEljuBrqNxd0QP0VBHCuT126oytk_rkhIEMTZEA_6XzjAT9Sbedl0BNRXbf5Azeyz-BL87Tq-MJyf_KxFqgTVr6NgcvAk4VvZTfSG332-lEVabcifVNX0VV23uKgb-SXy3dSUInC37zvvorRZ5C5rNXtmWd-mvh-rrZw9-LtldPczNVvo0JIsaq38-cRyQOTNNRogXE4ltSx6MC9sBKKiblzj0sj6wqZTy-3xwdaGhbwwV7euUQsFLMa7-N-74LUJwjd5g51SyBhE1ybMzo9Z8vurQsCBEPdEP8dHrJybBdwsKTh4FPH7fpG4PoZ-XR4yOr0B5tZqUZF4sMlFGkxemWyxLWCdR32p_HibA6ZOehZNg_UiTeN8paAl90rsj-CUtPQVg9DSmG5e22YclAI7LseNPnxy12d03ZDGbyyGdA8fqFXQG4j4fDonZmICGdGPtKKl_n6CMNSkIi7GVvRvkb9ACFmvYB_Cjvlq8", // <--- Paste your actual API key here!
+          "Content-Type": "application/json"
+        };
+
+        // 2. Now the fetch has access to the headers
+        const response = await fetch(
+          'https://events.vex.com/api/v2/seasons?program[]=1', 
+          { headers } 
+        );
+        const json = await response.json();
+
+        if (json.data && json.data.length > 0) {
+          const sortedSeasons = json.data.sort((a: Season, b: Season) => b.id - a.id);
+          setSeasons(sortedSeasons);
+          setActiveSeason(sortedSeasons[0].id.toString());
+        }
+      } catch (error) {
+        console.error("Failed to fetch seasons from VEX API", error);
+      }
+    };
+
+    fetchSeasons();
+  }, []); // 👉 The empty brackets [] mean "Only run this ONCE when the app starts"
 
   // ==========================================
   // FETCH LOGIC (Runs when you click the button)
@@ -27,13 +68,13 @@ export default function App() {
       // STEP 1: GET THE CORRECT TEAM ID & NAME
       // ==========================================
       const teamResponse = await fetch(
-        `https://www.robotevents.com/api/v2/teams?number=${searchNumber}&per_page=250`, 
+        `https://events.vex.com/api/v2/teams?number=${searchNumber}&per_page=250`, 
         { headers } // <-- 2. ADD THE HEADERS HERE!
       );
       const teamJson = await teamResponse.json();
   
       if (!teamJson.data || teamJson.data.length === 0) {
-        console.log("Team not found in RobotEvents!");
+        console.log("Team not found in VEXEvents!");
         return; 
       }
   
@@ -65,7 +106,7 @@ export default function App() {
       // STEP 2: FETCH MATCHES FOR CURRENT SEASON
       // ==========================================
       const matchResponse = await fetch(
-        `https://www.robotevents.com/api/v2/teams/${correctTeamId}/matches?season[]=197&per_page=250`, 
+        `https://events.vex.com/api/v2/teams/${correctTeamId}/matches?season[]=${activeSeason}&per_page=250`, 
         { headers } // <-- 3. ADD THE HEADERS HERE TOO!
       );
       const matchJson = await matchResponse.json();
@@ -381,6 +422,17 @@ export default function App() {
         >
           Head-to-Head Page
         </button>
+        <select 
+          value={activeSeason} 
+          onChange={(e) => setActiveSeason(e.target.value)}
+          style={{ marginLeft: '10px', padding: '5px' }}
+        >
+          {seasons.map((season) => (
+            <option key={season.id} value={season.id}>
+              {season.years_start}-{season.years_end}: {season.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* ----------- RENDER OVERVIEW PAGE ----------- */}
@@ -458,7 +510,7 @@ export default function App() {
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100vw' }}>
           
           {/* Centered Compare Button */}
-          <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #ddd' }}>
+          <div style={{ textAlign: 'center', padding: '20px', borderBottom: '1px solid #ddd' }}>
             <p style={{ margin: '0 0 10px 0', color: 'gray' }}>Enter both teams, then click Compare (Fetching Team A's season will find all matchups)</p>
             <button 
               onClick={() => fetchH2HMatches(teamA_Input, teamB_Input)}
@@ -522,7 +574,7 @@ export default function App() {
           </div>
 
           {/* Centered Compare Button */}
-          <div style={{ textAlign: 'center', padding: '120px', backgroundColor: '#ffffff', borderBottom: '1px solid #ddd' }}><h1 style={{ fontSize: '60px', margin: '-100px 0 0 0' }}>{h2h_ties}</h1>
+          <div style={{ textAlign: 'center', padding: '120px', borderBottom: '1px solid #ddd' }}><h1 style={{ fontSize: '60px', margin: '-100px 0 0 0' }}>{h2h_ties}</h1>
               <p style={{ fontSize: '20px', marginTop: '20px' }}>Ties</p>
           </div>
 
